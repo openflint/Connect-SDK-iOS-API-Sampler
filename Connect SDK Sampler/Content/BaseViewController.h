@@ -14,7 +14,7 @@
 //
 
 #import <ConnectSDK/ConnectSDK.h>
-
+//#import "ConnectSDK.h"
 @interface BaseViewController : UIViewController
 
 @property (nonatomic, assign) ConnectableDevice *device;

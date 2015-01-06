@@ -14,6 +14,7 @@
 //
 
 #import <ConnectSDK/ConnectSDK.h>
+//#import "ConnectSDK.h"
 
 @interface ControlTouchpadView : UIView
 

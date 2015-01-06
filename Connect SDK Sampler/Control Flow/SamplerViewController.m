@@ -17,6 +17,8 @@
 #import "BaseViewController.h"
 #import <ConnectSDK/AirPlayService.h>
 #import <ConnectSDK/DIALService.h>
+//#import "AirPlayService.h"
+//#import "DIALService.h"
 
 @interface SamplerViewController ()
 

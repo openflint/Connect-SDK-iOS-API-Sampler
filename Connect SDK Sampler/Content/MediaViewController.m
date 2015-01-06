@@ -96,6 +96,25 @@
     [_playAudioButton setEnabled:NO];
 }
 
+-(void)addMediaInfoSubscription {
+    
+    if ([self.device hasCapability:kMediaControlMetadataSubscribe]){
+        [_mediaControl subscribeMediaInfoWithSuccess:^(NSDictionary *responseObject) {
+            
+            self.mediaTitle.text = [responseObject objectForKey:@"title"];
+            self.artistName.text = [responseObject objectForKey:@"subtitle"];
+            NSURL *url = [NSURL URLWithString:[responseObject objectForKey:@"iconURL"]];
+            NSData *data = [NSData dataWithContentsOfURL:url];
+            UIImage *img = [[UIImage alloc] initWithData:data];
+            self.mediaIcon.image = img;
+            
+        }  failure:^(NSError *error)
+         {
+             NSLog(@"subscribe media info subscribe failure: %@", error.localizedDescription);
+         }];
+    }
+}
+
 - (void) resetMediaControlComponents
 {
     if (_playTimer)
@@ -142,6 +161,9 @@
     
     [_seekSlider setValue:0 animated:NO];
     [_volumeSlider setValue:0 animated:NO];
+    _mediaTitle.text = @"";
+    _artistName.text = @"";
+    _mediaIcon.image = nil;
 }
 
 - (void) enableMediaControlComponents
@@ -188,6 +210,7 @@
             NSLog(@"Get Vol Error %@", error.localizedDescription);
         }];
     }
+    [self addMediaInfoSubscription];
 }
 
 - (void) updateMediaInfo
@@ -206,6 +229,22 @@
         {
             _estimatedMediaPosition = position;
         } failure:nil];
+    }
+    
+    if ([self.device hasCapability:kMediaControlMetadata]){
+        
+        if([_mediaControl respondsToSelector:@selector(getMediaMetaDataWithSuccess:failure:)]){
+        [_mediaControl getMediaMetaDataWithSuccess:^(NSDictionary* responseObject) {
+        
+            self.mediaTitle.text = [responseObject objectForKey:@"title"];
+            self.artistName.text = [responseObject objectForKey:@"subtitle"];
+            NSURL *url = [NSURL URLWithString:[responseObject objectForKey:@"iconURL"]];
+            NSData *data = [NSData dataWithContentsOfURL:url];
+            UIImage *img = [[UIImage alloc] initWithData:data];
+            self.mediaIcon.image = img;
+        }failure:nil];
+        }
+        
     }
 }
 
@@ -237,9 +276,9 @@
     NSString *time;
 
     if (hours > 0)
-        time = [NSString stringWithFormat:@"%02i:%02i:%02i", hours, minutes, seconds];
+        time = [NSString stringWithFormat:@"%02li:%02li:%02li", (long)hours, (long)minutes, (long)seconds];
     else
-        time = [NSString stringWithFormat:@"%02i:%02i", minutes, seconds];
+        time = [NSString stringWithFormat:@"%02li:%02li", (long)minutes, (long)seconds];
 
     return time;
 }
@@ -260,21 +299,21 @@
     NSString *description = [[NSUserDefaults standardUserDefaults] stringForKey:@"imageDescription"];
     NSString *mimeType = [[NSUserDefaults standardUserDefaults] stringForKey:@"imageMimeType"];
     
-    [self.device.mediaPlayer displayImage:mediaURL
-                                  iconURL:iconURL
-                                    title:title
-                              description:description
-                                 mimeType:mimeType
+    MediaInfo *mediaInfo = [[MediaInfo alloc] initWithURL:mediaURL mimeType:mimeType];
+    mediaInfo.title = title;
+    mediaInfo.description = description;
+    ImageInfo *imageInfo = [[ImageInfo alloc] initWithURL:iconURL type:ImageTypeThumb];
+    [mediaInfo addImage:imageInfo];
+    
+    [self.device.mediaPlayer displayImage:mediaInfo
                                   success:^(LaunchSession *launchSession, id<MediaControl> mediaControl) {
                                       NSLog(@"display photo success");
-
                                       _launchSession = launchSession;
-                                      
                                       if ([self.device hasCapability:kMediaPlayerClose])
                                           [_closeMediaButton setEnabled:YES];
-                                  }
-                                  failure:^(NSError *error) {
+                                  } failure:^(NSError *error) {
                                       NSLog(@"display photo failure: %@", error.localizedDescription);
+                                      
                                   }];
 }
 
@@ -293,16 +332,15 @@
     NSString *mimeType = [[NSUserDefaults standardUserDefaults] stringForKey:@"videoMimeType"];
     BOOL shouldLoop = NO;
 
-    [self.device.mediaPlayer playMedia:mediaURL
-                               iconURL:iconURL
-                                 title:title
-                           description:description
-                              mimeType:mimeType
-                            shouldLoop:shouldLoop
-                               success:^(LaunchSession *launchSession, id <MediaControl> mediaControl)
-                               {
+    MediaInfo *mediaInfo = [[MediaInfo alloc] initWithURL:mediaURL mimeType:mimeType];
+    mediaInfo.title = title;
+    mediaInfo.description = description;
+    ImageInfo *imageInfo = [[ImageInfo alloc] initWithURL:iconURL type:ImageTypeThumb];
+    [mediaInfo addImage:imageInfo];
+    
+    [self.device.mediaPlayer playMedia:mediaInfo shouldLoop:shouldLoop
+                               success:^(LaunchSession *launchSession, id<MediaControl> mediaControl) {
                                    NSLog(@"display video success");
-
                                    _launchSession = launchSession;
                                    _mediaControl = mediaControl;
 
@@ -310,9 +348,7 @@
                                        [_closeMediaButton setEnabled:YES];
 
                                    [self enableMediaControlComponents];
-                               }
-                               failure:^(NSError *error)
-                               {
+                               } failure:^(NSError *error) {
                                    NSLog(@"display video failure: %@", error.localizedDescription);
                                }];
 }
@@ -332,28 +368,26 @@
     NSString *mimeType = [[NSUserDefaults standardUserDefaults] stringForKey:@"audioMimeType"];
     BOOL shouldLoop = NO;
     
-    [self.device.mediaPlayer playMedia:mediaURL
-                               iconURL:iconURL
-                                 title:title
-                           description:description
-                              mimeType:mimeType
-                            shouldLoop:shouldLoop
-                               success:^(LaunchSession *launchSession, id <MediaControl> mediaControl)
-     {
-         NSLog(@"display audio success");
-         
-         _launchSession = launchSession;
-         _mediaControl = mediaControl;
-         
-         if ([self.device hasCapability:kMediaPlayerClose])
-             [_closeMediaButton setEnabled:YES];
-         
-         [self enableMediaControlComponents];
-     }
-                               failure:^(NSError *error)
-     {
-         NSLog(@"display audio failure: %@", error.localizedDescription);
-     }];
+    MediaInfo *mediaInfo = [[MediaInfo alloc] initWithURL:mediaURL mimeType:mimeType];
+    mediaInfo.title = title;
+    mediaInfo.description = description;
+    ImageInfo *imageInfo = [[ImageInfo alloc] initWithURL:iconURL type:ImageTypeThumb];
+    [mediaInfo addImage:imageInfo];
+    
+    [self.device.mediaPlayer playMedia:mediaInfo shouldLoop:shouldLoop
+                               success:^(LaunchSession *launchSession, id<MediaControl> mediaControl) {
+                                   NSLog(@"display audio success");
+                                   
+                                   _launchSession = launchSession;
+                                   _mediaControl = mediaControl;
+                                   
+                                   if ([self.device hasCapability:kMediaPlayerClose])
+                                       [_closeMediaButton setEnabled:YES];
+                                   
+                                   [self enableMediaControlComponents];
+                               } failure:^(NSError *error) {
+                                   NSLog(@"display audio failure: %@", error.localizedDescription);
+                               }];
 }
 
 - (IBAction)closeMedia:(id)sender

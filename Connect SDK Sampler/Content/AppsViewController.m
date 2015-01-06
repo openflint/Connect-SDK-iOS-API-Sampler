@@ -15,6 +15,7 @@
 
 #import "AppsViewController.h"
 #import <ConnectSDK/DIALService.h>
+//#import "DIALService.h"
 
 @interface AppsViewController ()
 
